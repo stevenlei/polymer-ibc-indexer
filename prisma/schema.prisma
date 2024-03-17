@@ -1,0 +1,107 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Address {
+  address String    @id // 0x123456...
+  channel Channel[]
+  Packet  Packet[]
+  state   State[]
+}
+
+model Chain {
+  id         String    @id // optimism-sepolia, base-sepolia...
+  name       String
+  type       String // testnet, mainnet...
+  blocks     Block[]
+  channel    Channel[]
+  fromPacket Packet[]  @relation("FromChainId")
+  toPacket   Packet[]  @relation("ToChainId")
+  state      State[]
+}
+
+model Block {
+  id        String    @id // optimism-sepolia-123456 or base-sepolia-123456
+  chainId   String?
+  number    Int // 123456
+  hash      String // 0x123456...
+  timestamp Int // 1234567890
+  chain     Chain?    @relation(fields: [chainId], references: [id])
+  channel   Channel[]
+  state     State[]
+  packet    Packet[]
+}
+
+// For example channel-10000 + channel-10001 will result in 2 channel pairs
+model Channel {
+  id          String   @id // channel-10000
+  withId      String?  @unique // as we may not know the other channel id yet during the creation of the channel
+  chainId     String? // as we may not know the chain id yet during the creation of the channel
+  blockId     String? // as we may not know the block id yet during the creation of the channel
+  type        String? // universal / custom
+  txHash      String?
+  fromAddress String?
+  from        Address? @relation(fields: [fromAddress], references: [address])
+  block       Block?   @relation(fields: [blockId], references: [id])
+  chain       Chain?   @relation(fields: [chainId], references: [id])
+  with        Channel? @relation("ChannelWithId", fields: [withId], references: [id])
+  channel     Channel? @relation("ChannelWithId")
+  fromPacket  Packet[] @relation("FromChannelId")
+  toPacket    Packet[] @relation("ToChannelId")
+  state       State[]
+}
+
+model Packet {
+  id               String  @id // channel-10000-channel-10001-1 : [fromChannel]-[toChannel]-[sequence]
+  fromChainId      String
+  fromChannelId    String
+  toChainId        String
+  toChannelId      String
+  blockId          String
+  txHash           String
+  sequence         Int
+  fromAddress      String
+  currentState     String // SendPacket, RecvPacket, WriteAckPacket, Acknowledgement...
+  timeoutTimestamp Int
+  timestamp        Int
+  fromChain        Chain   @relation("FromChainId", fields: [fromChainId], references: [id])
+  toChain          Chain   @relation("ToChainId", fields: [toChainId], references: [id])
+  fromChannel      Channel @relation("FromChannelId", fields: [fromChannelId], references: [id])
+  toChannel        Channel @relation("ToChannelId", fields: [toChannelId], references: [id])
+  block            Block   @relation(fields: [blockId], references: [id])
+  from             Address @relation(fields: [fromAddress], references: [address])
+  state            State[]
+}
+
+model State {
+  id          String  @id // channel-10000-1-SendPacket : [channelId]-[sequence]-[state]
+  packetId    String
+  channelId   String
+  chainId     String
+  blockId     String
+  type        String // SendPacket, RecvPacket, WriteAckPacket, Acknowledgement...
+  timestamp   Int
+  latency     Int
+  fromAddress String
+  portAddress String
+  data        String
+  txHash      String
+  nonce       Int
+  index       Int
+  packet      Packet  @relation(fields: [packetId], references: [id])
+  channel     Channel @relation(fields: [channelId], references: [id])
+  block       Block   @relation(fields: [blockId], references: [id])
+  chain       Chain   @relation(fields: [chainId], references: [id])
+  from        Address @relation(fields: [fromAddress], references: [address])
+}
