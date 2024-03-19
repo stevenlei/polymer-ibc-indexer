@@ -28,10 +28,15 @@ CREATE TABLE "Block" (
 -- CreateTable
 CREATE TABLE "Channel" (
     "id" TEXT NOT NULL,
-    "withId" TEXT,
+    "counterpartyId" TEXT,
     "chainId" TEXT,
     "blockId" TEXT,
     "type" TEXT,
+    "client" TEXT,
+    "portAddress" TEXT,
+    "counterpartyPortId" TEXT,
+    "counterpartyPortAddress" TEXT,
+    "connectionHops" TEXT,
     "txHash" TEXT,
     "fromAddress" TEXT,
 
@@ -43,8 +48,8 @@ CREATE TABLE "Packet" (
     "id" TEXT NOT NULL,
     "fromChainId" TEXT NOT NULL,
     "fromChannelId" TEXT NOT NULL,
-    "toChainId" TEXT NOT NULL,
-    "toChannelId" TEXT NOT NULL,
+    "toChainId" TEXT,
+    "toChannelId" TEXT,
     "blockId" TEXT NOT NULL,
     "txHash" TEXT NOT NULL,
     "sequence" INTEGER NOT NULL,
@@ -77,7 +82,7 @@ CREATE TABLE "State" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Channel_withId_key" ON "Channel"("withId");
+CREATE UNIQUE INDEX "Channel_counterpartyId_key" ON "Channel"("counterpartyId");
 
 -- AddForeignKey
 ALTER TABLE "Block" ADD CONSTRAINT "Block_chainId_fkey" FOREIGN KEY ("chainId") REFERENCES "Chain"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -92,19 +97,19 @@ ALTER TABLE "Channel" ADD CONSTRAINT "Channel_blockId_fkey" FOREIGN KEY ("blockI
 ALTER TABLE "Channel" ADD CONSTRAINT "Channel_chainId_fkey" FOREIGN KEY ("chainId") REFERENCES "Chain"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Channel" ADD CONSTRAINT "Channel_withId_fkey" FOREIGN KEY ("withId") REFERENCES "Channel"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Channel" ADD CONSTRAINT "Channel_counterpartyId_fkey" FOREIGN KEY ("counterpartyId") REFERENCES "Channel"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Packet" ADD CONSTRAINT "Packet_fromChainId_fkey" FOREIGN KEY ("fromChainId") REFERENCES "Chain"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Packet" ADD CONSTRAINT "Packet_toChainId_fkey" FOREIGN KEY ("toChainId") REFERENCES "Chain"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Packet" ADD CONSTRAINT "Packet_toChainId_fkey" FOREIGN KEY ("toChainId") REFERENCES "Chain"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Packet" ADD CONSTRAINT "Packet_fromChannelId_fkey" FOREIGN KEY ("fromChannelId") REFERENCES "Channel"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Packet" ADD CONSTRAINT "Packet_toChannelId_fkey" FOREIGN KEY ("toChannelId") REFERENCES "Channel"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Packet" ADD CONSTRAINT "Packet_toChannelId_fkey" FOREIGN KEY ("toChannelId") REFERENCES "Channel"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Packet" ADD CONSTRAINT "Packet_blockId_fkey" FOREIGN KEY ("blockId") REFERENCES "Block"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

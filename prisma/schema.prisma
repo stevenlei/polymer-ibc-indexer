@@ -13,6 +13,42 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model RawEvent {
+  id               Int      @id @default(autoincrement())
+  chain            String
+  address          String
+  blockHash        String
+  blockNumber      Int
+  data             String
+  index            Int
+  removed          Boolean
+  topics           String
+  transactionHash  String
+  transactionIndex Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now())
+}
+
+model RawTransaction {
+  id                   Int      @id @default(autoincrement())
+  chain                String
+  blockNumber          Int
+  timestamp            Int
+  hash                 String
+  from                 String
+  to                   String?
+  value                String
+  gasPrice             String?
+  gasLimit             String?
+  maxPriorityFeePerGas String?
+  maxFeePerGas         String?
+  data                 String?
+  nonce                Int
+  index                Int
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @default(now())
+}
+
 model Address {
   address String    @id // 0x123456...
   channel Channel[]
@@ -45,29 +81,34 @@ model Block {
 
 // For example channel-10000 + channel-10001 will result in 2 channel pairs
 model Channel {
-  id          String   @id // channel-10000
-  withId      String?  @unique // as we may not know the other channel id yet during the creation of the channel
-  chainId     String? // as we may not know the chain id yet during the creation of the channel
-  blockId     String? // as we may not know the block id yet during the creation of the channel
-  type        String? // universal / custom
-  txHash      String?
-  fromAddress String?
-  from        Address? @relation(fields: [fromAddress], references: [address])
-  block       Block?   @relation(fields: [blockId], references: [id])
-  chain       Chain?   @relation(fields: [chainId], references: [id])
-  with        Channel? @relation("ChannelWithId", fields: [withId], references: [id])
-  channel     Channel? @relation("ChannelWithId")
-  fromPacket  Packet[] @relation("FromChannelId")
-  toPacket    Packet[] @relation("ToChannelId")
-  state       State[]
+  id                      String   @id // channel-10000 / init-0x123456...
+  counterpartyId          String?  @unique // as we may not know the other channel id yet during the creation of the channel
+  chainId                 String? // as we may not know the chain id yet during the creation of the channel
+  blockId                 String? // as we may not know the block id yet during the creation of the channel
+  type                    String? // universal / custom
+  client                  String? // optimism-sim / optimism-proof / base-sim / base-proof...
+  portAddress             String?
+  counterpartyPortId      String?
+  counterpartyPortAddress String?
+  connectionHops          String?
+  txHash                  String?
+  fromAddress             String?
+  from                    Address? @relation(fields: [fromAddress], references: [address])
+  block                   Block?   @relation(fields: [blockId], references: [id])
+  chain                   Chain?   @relation(fields: [chainId], references: [id])
+  counterparty            Channel? @relation("ChannelCounterpartyId", fields: [counterpartyId], references: [id])
+  channel                 Channel? @relation("ChannelCounterpartyId")
+  fromPacket              Packet[] @relation("FromChannelId")
+  toPacket                Packet[] @relation("ToChannelId")
+  state                   State[]
 }
 
 model Packet {
-  id               String  @id // channel-10000-channel-10001-1 : [fromChannel]-[toChannel]-[sequence]
+  id               String   @id // optimism-sepolia-channel-10000-1 : [chain]-[fromChannel]-[sequence]
   fromChainId      String
   fromChannelId    String
-  toChainId        String
-  toChannelId      String
+  toChainId        String? // as we may not know the to chain id yet during the creation of the packet
+  toChannelId      String? // as we may not know the to channel id yet during the creation of the packet
   blockId          String
   txHash           String
   sequence         Int
@@ -75,12 +116,12 @@ model Packet {
   currentState     String // SendPacket, RecvPacket, WriteAckPacket, Acknowledgement...
   timeoutTimestamp Int
   timestamp        Int
-  fromChain        Chain   @relation("FromChainId", fields: [fromChainId], references: [id])
-  toChain          Chain   @relation("ToChainId", fields: [toChainId], references: [id])
-  fromChannel      Channel @relation("FromChannelId", fields: [fromChannelId], references: [id])
-  toChannel        Channel @relation("ToChannelId", fields: [toChannelId], references: [id])
-  block            Block   @relation(fields: [blockId], references: [id])
-  from             Address @relation(fields: [fromAddress], references: [address])
+  fromChain        Chain    @relation("FromChainId", fields: [fromChainId], references: [id])
+  toChain          Chain?   @relation("ToChainId", fields: [toChainId], references: [id])
+  fromChannel      Channel  @relation("FromChannelId", fields: [fromChannelId], references: [id])
+  toChannel        Channel? @relation("ToChannelId", fields: [toChannelId], references: [id])
+  block            Block    @relation(fields: [blockId], references: [id])
+  from             Address  @relation(fields: [fromAddress], references: [address])
   state            State[]
 }
 

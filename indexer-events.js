@@ -1,11 +1,9 @@
-require("dotenv").config();
-
-// This is an indexer for catching all events from several contracts
-// Store the raw events data into text files
-// We will be processing the raw data in the next step
-
-const { ethers } = require("ethers");
+const { PrismaClient } = require("@prisma/client");
 const fs = require("fs");
+const { ethers } = require("ethers");
+
+const OP_GENESIS_BLOCK = 8752864;
+const BASE_GENESIS_BLOCK = 6768208;
 
 const providerOp = new ethers.JsonRpcProvider(process.env.OP_RPC_URL);
 const providerBase = new ethers.JsonRpcProvider(process.env.BASE_RPC_URL);
@@ -20,16 +18,21 @@ const baseContractAddresses = [
   process.env.BASE_DISPATCHER_SIM,
 ];
 
-const START_BLOCK_OP = getLastIndexedBlockNumber("op") + 1 || 8752864;
-const START_BLOCK_BASE = getLastIndexedBlockNumber("base") + 1 || 8752864;
+const prisma = new PrismaClient();
 
 async function main() {
-  // fetch all events from the contracts
-  // from the start block to the latest block
+  //
+  const lastBlockOp = await getLastIndexedBlockNumber("optimism-sepolia");
+  const lastBlockBase = await getLastIndexedBlockNumber("base-sepolia");
+
+  const START_BLOCK_OP = lastBlockOp ? lastBlockOp + 1 : OP_GENESIS_BLOCK;
+  const START_BLOCK_BASE = lastBlockBase
+    ? lastBlockBase + 1
+    : BASE_GENESIS_BLOCK;
 
   // OP
-  await indexEventsToFile(
-    "op",
+  await indexEventsToDB(
+    "optimism-sepolia",
     providerOp,
     opContractAddresses,
     START_BLOCK_OP,
@@ -37,8 +40,8 @@ async function main() {
   );
 
   // BASE
-  await indexEventsToFile(
-    "base",
+  await indexEventsToDB(
+    "base-sepolia",
     providerBase,
     baseContractAddresses,
     START_BLOCK_BASE,
@@ -46,21 +49,16 @@ async function main() {
   );
 }
 
-function getLastIndexedBlockNumber(chain) {
-  const files = fs.readdirSync(`${__dirname}/data`);
-  const chainFiles = files.filter((file) => file.startsWith(chain));
+async function getLastIndexedBlockNumber(chain) {
+  const lastRecord = await prisma.RawEvent.findFirst({
+    where: { chain },
+    orderBy: { blockNumber: "desc" },
+  });
 
-  if (chainFiles.length === 0) {
-    return 0;
-  }
-
-  const lastFile = chainFiles[chainFiles.length - 1];
-  const lastBlock = lastFile.split("-")[2];
-
-  return parseInt(lastBlock);
+  return lastRecord ? lastRecord.blockNumber : null;
 }
 
-async function indexEventsToFile(
+async function indexEventsToDB(
   chain,
   provider,
   contractAddresses,
@@ -75,6 +73,8 @@ async function indexEventsToFile(
     )}`
   );
 
+  let batch = 0;
+
   for (let i = startBlock; i < latestBlock; i += perBatch) {
     const fromBlock = i;
     const toBlock = Math.min(i + perBatch, latestBlock);
@@ -87,12 +87,31 @@ async function indexEventsToFile(
 
     const events = await provider.getLogs(filter);
 
-    const fileName = `${__dirname}/data/${chain}-${fromBlock}-${toBlock}.json`;
-    const data = JSON.stringify(events);
+    await prisma.RawEvent.createMany({
+      data: events.map((event) => ({
+        chain,
+        address: event.address,
+        blockHash: event.blockHash,
+        blockNumber: event.blockNumber,
+        data: event.data,
+        index: event.index,
+        removed: event.removed,
+        topics: JSON.stringify(event.topics),
+        transactionHash: event.transactionHash,
+        transactionIndex: event.transactionIndex,
+      })),
+      skipDuplicates: true,
+    });
 
-    fs.writeFileSync(fileName, data);
+    batch++;
 
-    console.log(`Wrote ${events.length} events to ${fileName}`);
+    console.log(
+      `Indexed ${
+        events.length
+      } events from block ${fromBlock} to ${toBlock} ${batch} of ${Math.ceil(
+        (latestBlock - startBlock) / perBatch
+      )}`
+    );
   }
 }
 
