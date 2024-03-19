@@ -93,6 +93,8 @@ model Channel {
   connectionHops          String?
   txHash                  String?
   fromAddress             String?
+  stage                   Int      @default(0)
+  timestamp               Int
   from                    Address? @relation(fields: [fromAddress], references: [address])
   block                   Block?   @relation(fields: [blockId], references: [id])
   chain                   Chain?   @relation(fields: [chainId], references: [id])
@@ -145,4 +147,11 @@ model State {
   block       Block   @relation(fields: [blockId], references: [id])
   chain       Chain   @relation(fields: [chainId], references: [id])
   from        Address @relation(fields: [fromAddress], references: [address])
+}
+
+model IndexerStatus {
+  id        String   @id
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
 }

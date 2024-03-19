@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Channel" ADD COLUMN     "stage" INTEGER NOT NULL DEFAULT 0;

@@ -132,8 +132,15 @@ async function getBlocksAndTransactionsInRange(
   return combined;
 }
 
-main();
-
+main()
+  .then(async () => {
+    await prisma.$disconnect();
+  })
+  .catch(async (e) => {
+    console.error(e);
+    await prisma.$disconnect();
+    process.exit(1);
+  });
 async function wait(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
