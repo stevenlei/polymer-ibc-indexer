@@ -6,7 +6,10 @@
   "scripts": {
     "events": "node index-events.js",
     "transactions": "node index-transactions.js",
-    "process": "node process-data.js"
+    "process": "node process-data.js",
+    "start:events": "node index-events.js --watch",
+    "start:transactions": "node index-transactions.js --watch",
+    "start:process": "node process-data.js --watch"
   },
   "keywords": [],
   "author": "",

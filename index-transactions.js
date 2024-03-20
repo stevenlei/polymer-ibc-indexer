@@ -7,15 +7,33 @@ const { PrismaClient } = require("@prisma/client");
 // We will be processing the raw data in the next step
 
 const { ethers } = require("ethers");
-const fs = require("fs");
 
 const providerOp = new ethers.JsonRpcProvider(process.env.OP_RPC_URL);
 const providerBase = new ethers.JsonRpcProvider(process.env.BASE_RPC_URL);
 
 const prisma = new PrismaClient();
 
+// if running this script with --watch, keep running indefinitely
+const watch = process.argv.includes("--watch");
+
+if (watch) {
+  console.log(`Running in watch mode`);
+}
+
 async function main() {
   //
+  while (true) {
+    await indexTransactions();
+    if (!watch) {
+      break;
+    }
+
+    // 10 seconds between indexing runs
+    await wait(10 * 1000);
+  }
+}
+
+async function indexTransactions() {
   await getBlocksAndTransactions("optimism-sepolia", providerOp);
   await getBlocksAndTransactions("base-sepolia", providerBase);
 }
@@ -141,6 +159,7 @@ main()
     await prisma.$disconnect();
     process.exit(1);
   });
+
 async function wait(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);

@@ -20,8 +20,27 @@ const baseContractAddresses = [
 
 const prisma = new PrismaClient();
 
+// if running this script with --watch, keep running indefinitely
+const watch = process.argv.includes("--watch");
+
+if (watch) {
+  console.log(`Running in watch mode`);
+}
+
 async function main() {
   //
+  while (true) {
+    await indexEvents();
+    if (!watch) {
+      break;
+    }
+
+    // 10 seconds between indexing runs
+    await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
+  }
+}
+
+async function indexEvents() {
   const lastBlockOp = await getLastIndexedBlockNumber("optimism-sepolia");
   const lastBlockBase = await getLastIndexedBlockNumber("base-sepolia");
 
