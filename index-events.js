@@ -87,7 +87,7 @@ async function indexEventsToDB(
 
     const events = await provider.getLogs(filter);
 
-    await prisma.RawEvent.createMany({
+    await prisma.rawEvent.createMany({
       data: events.map((event) => ({
         chain,
         address: event.address,

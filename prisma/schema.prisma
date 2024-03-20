@@ -27,13 +27,15 @@ model RawEvent {
   transactionIndex Int
   createdAt        DateTime @default(now())
   updatedAt        DateTime @default(now())
+
+  @@index([transactionHash], name: "transactionHash")
 }
 
 model RawTransaction {
   id                   Int      @id @default(autoincrement())
   chain                String
   blockNumber          Int
-  timestamp            Int
+  timestamp            BigInt
   hash                 String
   from                 String
   to                   String?
@@ -47,6 +49,8 @@ model RawTransaction {
   index                Int
   createdAt            DateTime @default(now())
   updatedAt            DateTime @default(now())
+
+  @@index([hash], name: "hash")
 }
 
 model Address {
@@ -68,11 +72,11 @@ model Chain {
 }
 
 model Block {
-  id        String    @id // optimism-sepolia-123456 or base-sepolia-123456
+  id        String    @id // optimism-sepolia.123456 or base-sepolia.123456
   chainId   String?
   number    Int // 123456
   hash      String // 0x123456...
-  timestamp Int // 1234567890
+  timestamp BigInt // 1234567890
   chain     Chain?    @relation(fields: [chainId], references: [id])
   channel   Channel[]
   state     State[]
@@ -81,7 +85,7 @@ model Block {
 
 // For example channel-10000 + channel-10001 will result in 2 channel pairs
 model Channel {
-  id                      String   @id // channel-10000 / init-0x123456...
+  id                      String   @id // channel-10000
   counterpartyId          String?  @unique // as we may not know the other channel id yet during the creation of the channel
   chainId                 String? // as we may not know the chain id yet during the creation of the channel
   blockId                 String? // as we may not know the block id yet during the creation of the channel
@@ -94,7 +98,7 @@ model Channel {
   txHash                  String?
   fromAddress             String?
   stage                   Int      @default(0)
-  timestamp               Int
+  timestamp               BigInt
   from                    Address? @relation(fields: [fromAddress], references: [address])
   block                   Block?   @relation(fields: [blockId], references: [id])
   chain                   Chain?   @relation(fields: [chainId], references: [id])
@@ -103,10 +107,17 @@ model Channel {
   fromPacket              Packet[] @relation("FromChannelId")
   toPacket                Packet[] @relation("ToChannelId")
   state                   State[]
+
+  @@index([chainId], name: "chainId")
+  @@index([type], name: "type")
+  @@index([client], name: "client")
+  @@index([portAddress], name: "portAddress")
+  @@index([counterpartyPortAddress], name: "counterpartyPortAddress")
+  @@index([fromAddress], name: "fromAddress")
 }
 
 model Packet {
-  id               String   @id // optimism-sepolia-channel-10000-1 : [chain]-[fromChannel]-[sequence]
+  id               String   @id // channel-10000.1 : [fromChannel].[sequence]
   fromChainId      String
   fromChannelId    String
   toChainId        String? // as we may not know the to chain id yet during the creation of the packet
@@ -116,8 +127,8 @@ model Packet {
   sequence         Int
   fromAddress      String
   currentState     String // SendPacket, RecvPacket, WriteAckPacket, Acknowledgement...
-  timeoutTimestamp Int
-  timestamp        Int
+  timeoutTimestamp BigInt
+  timestamp        BigInt
   fromChain        Chain    @relation("FromChainId", fields: [fromChainId], references: [id])
   toChain          Chain?   @relation("ToChainId", fields: [toChainId], references: [id])
   fromChannel      Channel  @relation("FromChannelId", fields: [fromChannelId], references: [id])
@@ -125,16 +136,19 @@ model Packet {
   block            Block    @relation(fields: [blockId], references: [id])
   from             Address  @relation(fields: [fromAddress], references: [address])
   state            State[]
+
+  @@index([fromChannelId], name: "fromChannelId")
+  @@index([toChannelId], name: "toChannelId")
 }
 
 model State {
-  id          String  @id // channel-10000-1-SendPacket : [channelId]-[sequence]-[state]
+  id          String  @id // channel-10000.1.SendPacket : [channelId].[sequence].[state]
   packetId    String
   channelId   String
   chainId     String
   blockId     String
   type        String // SendPacket, RecvPacket, WriteAckPacket, Acknowledgement...
-  timestamp   Int
+  timestamp   BigInt
   latency     Int
   fromAddress String
   portAddress String
@@ -147,6 +161,9 @@ model State {
   block       Block   @relation(fields: [blockId], references: [id])
   chain       Chain   @relation(fields: [chainId], references: [id])
   from        Address @relation(fields: [fromAddress], references: [address])
+
+  @@index([packetId], name: "packetId")
+  @@index([channelId], name: "channelId")
 }
 
 model IndexerStatus {

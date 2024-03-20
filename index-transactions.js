@@ -36,7 +36,7 @@ async function getBlocksAndTransactions(chain, provider) {
     return;
   }
 
-  if (lastTransactionRecord.blockNumber > lastEventRecord.blockNumber) {
+  if (lastTransactionRecord.blockNumber >= lastEventRecord.blockNumber) {
     console.log(
       `It is up to date. No need to process the transactions for ${chain}`
     );

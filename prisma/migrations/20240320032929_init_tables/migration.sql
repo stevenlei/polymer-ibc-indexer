@@ -1,4 +1,46 @@
 -- CreateTable
+CREATE TABLE "RawEvent" (
+    "id" SERIAL NOT NULL,
+    "chain" TEXT NOT NULL,
+    "address" TEXT NOT NULL,
+    "blockHash" TEXT NOT NULL,
+    "blockNumber" INTEGER NOT NULL,
+    "data" TEXT NOT NULL,
+    "index" INTEGER NOT NULL,
+    "removed" BOOLEAN NOT NULL,
+    "topics" TEXT NOT NULL,
+    "transactionHash" TEXT NOT NULL,
+    "transactionIndex" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "RawEvent_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RawTransaction" (
+    "id" SERIAL NOT NULL,
+    "chain" TEXT NOT NULL,
+    "blockNumber" INTEGER NOT NULL,
+    "timestamp" BIGINT NOT NULL,
+    "hash" TEXT NOT NULL,
+    "from" TEXT NOT NULL,
+    "to" TEXT,
+    "value" TEXT NOT NULL,
+    "gasPrice" TEXT,
+    "gasLimit" TEXT,
+    "maxPriorityFeePerGas" TEXT,
+    "maxFeePerGas" TEXT,
+    "data" TEXT,
+    "nonce" INTEGER NOT NULL,
+    "index" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "RawTransaction_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Address" (
     "address" TEXT NOT NULL,
 
@@ -20,7 +62,7 @@ CREATE TABLE "Block" (
     "chainId" TEXT,
     "number" INTEGER NOT NULL,
     "hash" TEXT NOT NULL,
-    "timestamp" INTEGER NOT NULL,
+    "timestamp" BIGINT NOT NULL,
 
     CONSTRAINT "Block_pkey" PRIMARY KEY ("id")
 );
@@ -39,6 +81,8 @@ CREATE TABLE "Channel" (
     "connectionHops" TEXT,
     "txHash" TEXT,
     "fromAddress" TEXT,
+    "stage" INTEGER NOT NULL DEFAULT 0,
+    "timestamp" BIGINT NOT NULL,
 
     CONSTRAINT "Channel_pkey" PRIMARY KEY ("id")
 );
@@ -55,8 +99,8 @@ CREATE TABLE "Packet" (
     "sequence" INTEGER NOT NULL,
     "fromAddress" TEXT NOT NULL,
     "currentState" TEXT NOT NULL,
-    "timeoutTimestamp" INTEGER NOT NULL,
-    "timestamp" INTEGER NOT NULL,
+    "timeoutTimestamp" BIGINT NOT NULL,
+    "timestamp" BIGINT NOT NULL,
 
     CONSTRAINT "Packet_pkey" PRIMARY KEY ("id")
 );
@@ -69,7 +113,7 @@ CREATE TABLE "State" (
     "chainId" TEXT NOT NULL,
     "blockId" TEXT NOT NULL,
     "type" TEXT NOT NULL,
-    "timestamp" INTEGER NOT NULL,
+    "timestamp" BIGINT NOT NULL,
     "latency" INTEGER NOT NULL,
     "fromAddress" TEXT NOT NULL,
     "portAddress" TEXT NOT NULL,
@@ -81,8 +125,54 @@ CREATE TABLE "State" (
     CONSTRAINT "State_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "IndexerStatus" (
+    "id" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "IndexerStatus_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE INDEX "transactionHash" ON "RawEvent"("transactionHash");
+
+-- CreateIndex
+CREATE INDEX "hash" ON "RawTransaction"("hash");
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Channel_counterpartyId_key" ON "Channel"("counterpartyId");
+
+-- CreateIndex
+CREATE INDEX "chainId" ON "Channel"("chainId");
+
+-- CreateIndex
+CREATE INDEX "type" ON "Channel"("type");
+
+-- CreateIndex
+CREATE INDEX "client" ON "Channel"("client");
+
+-- CreateIndex
+CREATE INDEX "portAddress" ON "Channel"("portAddress");
+
+-- CreateIndex
+CREATE INDEX "counterpartyPortAddress" ON "Channel"("counterpartyPortAddress");
+
+-- CreateIndex
+CREATE INDEX "fromAddress" ON "Channel"("fromAddress");
+
+-- CreateIndex
+CREATE INDEX "fromChannelId" ON "Packet"("fromChannelId");
+
+-- CreateIndex
+CREATE INDEX "toChannelId" ON "Packet"("toChannelId");
+
+-- CreateIndex
+CREATE INDEX "packetId" ON "State"("packetId");
+
+-- CreateIndex
+CREATE INDEX "channelId" ON "State"("channelId");
 
 -- AddForeignKey
 ALTER TABLE "Block" ADD CONSTRAINT "Block_chainId_fkey" FOREIGN KEY ("chainId") REFERENCES "Chain"("id") ON DELETE SET NULL ON UPDATE CASCADE;
