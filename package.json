@@ -9,7 +9,9 @@
     "process": "node process-data.js",
     "start:events": "node index-events.js --watch",
     "start:transactions": "node index-transactions.js --watch",
-    "start:process": "node process-data.js --watch"
+    "start:process": "node process-data.js --watch",
+    "dev": "nodemon src/graphql/server.js",
+    "serve": "node src/graphql/server.js"
   },
   "keywords": [],
   "author": "",
@@ -17,9 +19,12 @@
   "dependencies": {
     "@prisma/client": "^5.11.0",
     "dotenv": "^16.4.5",
-    "ethers": "^6.11.1"
+    "ethers": "^6.11.1",
+    "graphql": "^16.8.1",
+    "graphql-yoga": "^5.2.0"
   },
   "devDependencies": {
+    "nodemon": "^3.1.0",
     "prisma": "^5.11.0"
   }
 }
