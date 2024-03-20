@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "events": "node index-events.js",
+    "transactions": "node index-transactions.js",
+    "process": "node process-data.js"
   },
   "keywords": [],
   "author": "",
