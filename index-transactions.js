@@ -34,8 +34,11 @@ async function main() {
 }
 
 async function indexTransactions() {
-  await getBlocksAndTransactions("optimism-sepolia", providerOp);
-  await getBlocksAndTransactions("base-sepolia", providerBase);
+  // run both chains in parallel
+  return Promise.all([
+    getBlocksAndTransactions("optimism-sepolia", providerOp),
+    getBlocksAndTransactions("base-sepolia", providerBase),
+  ]);
 }
 
 async function getBlocksAndTransactions(chain, provider) {
@@ -140,7 +143,7 @@ async function getBlocksAndTransactionsInRange(
       );
     }
 
-    console.log(`> Processed chunk ${i + 1} of ${chunks.length}`);
+    console.log(`[${chain}] Processed chunk ${i + 1} of ${chunks.length}`);
     await wait(1000);
   }
 

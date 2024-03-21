@@ -49,27 +49,47 @@ async function indexEvents() {
     ? lastBlockBase + 1
     : BASE_GENESIS_BLOCK;
 
-  // OP
-  await indexEventsToDB(
-    "optimism-sepolia",
-    providerOp,
-    opContractAddresses,
-    START_BLOCK_OP,
-    5000
-  );
+  const all = await Promise.all([
+    getNewEvents(
+      "optimism-sepolia",
+      providerOp,
+      opContractAddresses,
+      START_BLOCK_OP,
+      5000
+    ),
+    getNewEvents(
+      "base-sepolia",
+      providerBase,
+      baseContractAddresses,
+      START_BLOCK_BASE,
+      5000
+    ),
+  ]);
 
-  // BASE
-  await indexEventsToDB(
-    "base-sepolia",
-    providerBase,
-    baseContractAddresses,
-    START_BLOCK_BASE,
-    5000
-  );
+  const events = all.flat();
+
+  console.log(`Total new events`, events.length);
+
+  // write to db in batches
+  await prisma.rawEvent.createMany({
+    data: events.map((event) => ({
+      chain: event.chain,
+      address: event.address,
+      blockHash: event.blockHash,
+      blockNumber: event.blockNumber,
+      data: event.data,
+      index: event.index,
+      removed: event.removed,
+      topics: JSON.stringify(event.topics),
+      transactionHash: event.transactionHash,
+      transactionIndex: event.transactionIndex,
+    })),
+    skipDuplicates: true,
+  });
 }
 
 async function getLastIndexedBlockNumber(chain) {
-  const lastRecord = await prisma.RawEvent.findFirst({
+  const lastRecord = await prisma.rawEvent.findFirst({
     where: { chain },
     orderBy: { blockNumber: "desc" },
   });
@@ -77,7 +97,7 @@ async function getLastIndexedBlockNumber(chain) {
   return lastRecord ? lastRecord.blockNumber : null;
 }
 
-async function indexEventsToDB(
+async function getNewEvents(
   chain,
   provider,
   contractAddresses,
@@ -94,6 +114,8 @@ async function indexEventsToDB(
 
   let batch = 0;
 
+  const results = [];
+
   for (let i = startBlock; i < latestBlock; i += perBatch) {
     const fromBlock = i;
     const toBlock = Math.min(i + perBatch, latestBlock);
@@ -106,21 +128,7 @@ async function indexEventsToDB(
 
     const events = await provider.getLogs(filter);
 
-    await prisma.rawEvent.createMany({
-      data: events.map((event) => ({
-        chain,
-        address: event.address,
-        blockHash: event.blockHash,
-        blockNumber: event.blockNumber,
-        data: event.data,
-        index: event.index,
-        removed: event.removed,
-        topics: JSON.stringify(event.topics),
-        transactionHash: event.transactionHash,
-        transactionIndex: event.transactionIndex,
-      })),
-      skipDuplicates: true,
-    });
+    results.push(...events.map((event) => ({ ...event, chain })));
 
     batch++;
 
@@ -132,6 +140,8 @@ async function indexEventsToDB(
       )}`
     );
   }
+
+  return results;
 }
 
 main()
