@@ -27,6 +27,7 @@ module.exports = /* GraphQL */ `
       limit: Int
       offset: Int
       order: Order
+      sequence: Int
     ): PacketConnection
     packet(id: String!): Packet
 

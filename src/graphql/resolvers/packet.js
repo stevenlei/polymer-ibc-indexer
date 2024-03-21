@@ -9,6 +9,7 @@ packets(
   limit: Int
   offset: Int
   order: Order
+  sequence: Int
 ): PacketConnection
 packet(id: String!): Packet
 
@@ -144,6 +145,7 @@ module.exports = {
         limit = 50,
         offset,
         order,
+        sequence,
       } = _args;
 
       const where = {
@@ -151,6 +153,7 @@ module.exports = {
         fromChannelId: fromChannelId ? { equals: fromChannelId } : undefined,
         toChainId: toChainId ? { equals: toChainId } : undefined,
         toChannelId: toChannelId ? { equals: toChannelId } : undefined,
+        sequence: sequence ? { equals: sequence } : undefined,
       };
 
       const results = await prisma.packet.findMany({
@@ -184,7 +187,7 @@ module.exports = {
         list: results.map((packet) => {
           return {
             ...packet,
-            currentState: packet.currentState.toUpperCase(),
+            currentState: packet.currentState,
             timestamp: Number(packet.timestamp),
           };
         }),
