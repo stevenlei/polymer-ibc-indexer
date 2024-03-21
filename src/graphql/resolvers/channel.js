@@ -9,8 +9,15 @@ channels(
   status: ChannelStatus
   limit: Int
   offset: Int
+  order: Order
+  channelId: String
 ): ChannelConnection
 channel(id: String!): Channel
+
+enum Order {
+  ASC
+  DESC
+}
 
 type Chain {
   id: String
@@ -105,6 +112,9 @@ module.exports = {
         status,
         limit = 50,
         offset,
+        order = "ASC",
+        keyword,
+        channelId,
       } = _args;
       const where = {
         chainId: chainId ? { equals: chainId } : undefined,
@@ -112,6 +122,14 @@ module.exports = {
         client: client ? { equals: client } : undefined,
         portAddress: portAddress ? { equals: portAddress } : undefined,
         status: status ? { equals: status } : undefined,
+        AND: channelId
+          ? {
+              OR: [
+                { id: { equals: channelId } },
+                { counterpartyId: { equals: channelId } },
+              ],
+            }
+          : undefined,
       };
 
       const results = await prisma.channel.findMany({
@@ -126,10 +144,10 @@ module.exports = {
         skip: offset,
         orderBy: [
           {
-            timestamp: "asc",
+            timestamp: order.toLowerCase(),
           },
           {
-            id: "asc",
+            id: order.toLowerCase(),
           },
         ],
       });

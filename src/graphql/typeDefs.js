@@ -14,6 +14,8 @@ module.exports = /* GraphQL */ `
       status: ChannelStatus
       limit: Int
       offset: Int
+      order: Order
+      channelId: String
     ): ChannelConnection
     channel(id: String!): Channel
 
