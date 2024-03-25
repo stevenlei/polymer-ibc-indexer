@@ -10,8 +10,9 @@ packets(
   offset: Int
   order: Order
   sequence: Int
+  from: String
 ): PacketConnection
-packet(id: String!): Packet
+packet(id: String, tx: String): Packet
 
 packetStates(packetId: String!): [PacketState]
 
@@ -91,6 +92,20 @@ type Channel {
   timestamp: Int
 }
 
+type ChannelStats {
+  success: Int
+  timedout: Int
+  packetStats: ChannelPacketStats
+}
+
+type ChannelPacketStats {
+  averageLatency: Int
+  percentiles50: Int
+  percentiles90: Int
+  percentiles95: Int
+  percentiles99: Int
+}
+
 enum PacketState {
   SendPacket
   RecvPacket
@@ -146,6 +161,7 @@ module.exports = {
         offset,
         order,
         sequence,
+        from,
       } = _args;
 
       const where = {
@@ -155,6 +171,21 @@ module.exports = {
         toChannelId: toChannelId ? { equals: toChannelId } : undefined,
         sequence: sequence ? { equals: sequence } : undefined,
       };
+
+      if (from) {
+        where.state = {
+          some: {
+            OR: [
+              {
+                fromAddress: from,
+              },
+              {
+                portAddress: from,
+              },
+            ],
+          },
+        };
+      }
 
       const results = await prisma.packet.findMany({
         where,
@@ -192,6 +223,36 @@ module.exports = {
           };
         }),
       };
+    },
+    packet: async (_parent, _args, { prisma }) => {
+      // handle the query
+      const { id, tx } = _args;
+
+      if (id) {
+        return await prisma.packet.findUnique({
+          where: {
+            id,
+          },
+        });
+      }
+
+      if (tx) {
+        const stateWithTx = await prisma.state.findFirst({
+          where: {
+            txHash: tx,
+          },
+        });
+
+        if (stateWithTx) {
+          return await prisma.packet.findUnique({
+            where: {
+              id: stateWithTx.packetId,
+            },
+          });
+        }
+      }
+
+      return null;
     },
   },
   Packet: {

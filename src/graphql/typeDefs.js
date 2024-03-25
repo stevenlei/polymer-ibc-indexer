@@ -28,8 +28,9 @@ module.exports = /* GraphQL */ `
       offset: Int
       order: Order
       sequence: Int
+      from: String
     ): PacketConnection
-    packet(id: String!): Packet
+    packet(id: String, tx: String): Packet
 
     packetStates(packetId: String!): [PacketState]
   }
