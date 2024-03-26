@@ -172,3 +172,22 @@ model IndexerStatus {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now())
 }
+
+model RawContract {
+  id               Int      @id @default(autoincrement())
+  chain            String
+  timestamp        BigInt
+  blockNumber      Int
+  from             String
+  address          String
+  data             String
+  index            Int
+  removed          Boolean
+  transactionHash  String
+  transactionIndex Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now())
+
+  @@index([transactionHash], name: "contractTransactionHash")
+  @@index([address], name: "contractAddress")
+}

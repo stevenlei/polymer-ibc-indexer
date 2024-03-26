@@ -143,5 +143,13 @@ module.exports = /* GraphQL */ `
     from: Address
     portAddress: String
     txHash: String
+    latencyStats: PacketStateLatency
+  }
+
+  type PacketStateLatency {
+    median: Int
+    p90: Int
+    p95: Int
+    p99: Int
   }
 `;

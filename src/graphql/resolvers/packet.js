@@ -140,7 +140,6 @@ type PacketState {
   latency: Int
   from: Address
   portAddress: String
-  txHash: String
 }
 */
 

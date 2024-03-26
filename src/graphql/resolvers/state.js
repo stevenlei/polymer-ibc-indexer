@@ -1,5 +1,7 @@
 // this is a graphql resolver
 
+const { Prisma } = require("@prisma/client");
+
 /*
 packetStates(packetId: String!): [PacketState]
 
@@ -43,6 +45,14 @@ type PacketState {
   from: Address
   portAddress: String
   txHash: String
+  latencyStats: PacketStateLatency
+}
+
+type PacketStateLatency {
+  median: Int
+  p90: Int
+  p95: Int
+  p99: Int
 }
 */
 
@@ -130,6 +140,53 @@ module.exports = {
     },
     latency: (parent) => {
       return Number(parent.latency);
+    },
+    latencyStats: async (parent, _args, { prisma }) => {
+      // Use raw SQL query to calculate latency stats
+
+      /*
+        Example:
+        SELECT
+          PERCENTILE_DISC(0.5) within group (order by "State"."latency") as median,
+          PERCENTILE_DISC(0.9) within group (order by "State"."latency") as p90,
+          PERCENTILE_DISC(0.95) within group (order by "State"."latency") as p95,
+          PERCENTILE_DISC(0.99) within group (order by "State"."latency") as p99
+        FROM "State" WHERE "State"."type" = 'RecvPacket' AND "State"."channelId" = 'channel-10';
+  
+        SELECT
+          PERCENTILE_DISC(0.5) within group (order by "State"."latency") as median,
+          PERCENTILE_DISC(0.9) within group (order by "State"."latency") as p90,
+          PERCENTILE_DISC(0.95) within group (order by "State"."latency") as p95,
+          PERCENTILE_DISC(0.99) within group (order by "State"."latency") as p99
+        FROM "State" WHERE "State"."type" = 'Acknowledgement' AND "State"."channelId" = 'channel-10';
+        */
+
+      if (parent.type === "SendPacket" || parent.type === "WriteAckPacket") {
+        return {
+          median: 0,
+          p90: 0,
+          p95: 0,
+          p99: 0,
+        };
+      }
+
+      const stats = await prisma.$queryRaw(
+        Prisma.sql`
+            SELECT
+              PERCENTILE_DISC(0.5) within group (order by "State"."latency") as median,
+              PERCENTILE_DISC(0.9) within group (order by "State"."latency") as p90,
+              PERCENTILE_DISC(0.95) within group (order by "State"."latency") as p95,
+              PERCENTILE_DISC(0.99) within group (order by "State"."latency") as p99
+            FROM "State" WHERE "State"."type" = ${parent.type} AND "State"."channelId" = ${parent.channelId}
+          `
+      );
+
+      return {
+        median: Number(stats[0].median),
+        p90: Number(stats[0].p90),
+        p95: Number(stats[0].p95),
+        p99: Number(stats[0].p99),
+      };
     },
   },
   Mutation: {},
