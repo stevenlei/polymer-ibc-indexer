@@ -165,10 +165,16 @@ module.exports = {
       } = _args;
 
       const where = {
-        fromChainId: fromChainId ? { equals: fromChainId } : undefined,
-        fromChannelId: fromChannelId ? { equals: fromChannelId } : undefined,
-        toChainId: toChainId ? { equals: toChainId } : undefined,
-        toChannelId: toChannelId ? { equals: toChannelId } : undefined,
+        fromChainId: fromChainId
+          ? { equals: fromChainId.toLowerCase() }
+          : undefined,
+        fromChannelId: fromChannelId
+          ? { equals: fromChannelId.toLowerCase() }
+          : undefined,
+        toChainId: toChainId ? { equals: toChainId.toLowerCase() } : undefined,
+        toChannelId: toChannelId
+          ? { equals: toChannelId.toLowerCase() }
+          : undefined,
         sequence: sequence ? { equals: sequence } : undefined,
       };
 
@@ -177,10 +183,16 @@ module.exports = {
           some: {
             OR: [
               {
-                fromAddress: from,
+                fromAddress: {
+                  equals: from,
+                  mode: "insensitive",
+                },
               },
               {
-                portAddress: from,
+                portAddress: {
+                  equals: from,
+                  mode: "insensitive",
+                },
               },
             ],
           },
@@ -239,7 +251,10 @@ module.exports = {
       if (tx) {
         const stateWithTx = await prisma.state.findFirst({
           where: {
-            txHash: tx,
+            txHash: {
+              equals: tx,
+              mode: "insensitive",
+            },
           },
         });
 
