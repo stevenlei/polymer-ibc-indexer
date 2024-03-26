@@ -204,7 +204,7 @@ module.exports = {
             timestamp: order === "ASC" ? "asc" : "desc",
           },
           {
-            sequence: "asc",
+            sequence: "desc",
           },
         ],
       });
