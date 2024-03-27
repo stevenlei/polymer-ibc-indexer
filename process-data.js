@@ -333,176 +333,188 @@ async function processData() {
         } else if (decodedEvent.type === "RecvPacket") {
           // console.log("RecvPacket", decodedEvent);
 
-          const channel = await prisma.channel.findFirst({
-            where: {
-              id: decodedEvent.channelId,
-            },
-            include: {
-              counterparty: true,
-            },
-          });
+          try {
+            const channel = await prisma.channel.findFirst({
+              where: {
+                id: decodedEvent.channelId,
+              },
+              include: {
+                counterparty: true,
+              },
+            });
 
-          // this is the packet receiving event
-          // update the packet record
+            // this is the packet receiving event
+            // update the packet record
 
-          const packetId = `${channel.counterparty.id}.${decodedEvent.sequence}`;
+            const packetId = `${channel.counterparty.id}.${decodedEvent.sequence}`;
 
-          const packet = await prisma.packet.update({
-            where: { id: packetId },
-            data: {
-              currentState: "RecvPacket",
-            },
-          });
+            const packet = await prisma.packet.update({
+              where: { id: packetId },
+              data: {
+                currentState: "RecvPacket",
+              },
+            });
 
-          // get the SendPacket state
-          const sendPacketState = await prisma.state.findFirst({
-            where: {
-              packetId: packet.id,
-              type: "SendPacket",
-            },
-          });
+            // get the SendPacket state
+            const sendPacketState = await prisma.state.findFirst({
+              where: {
+                packetId: packet.id,
+                type: "SendPacket",
+              },
+            });
 
-          // create state
-          await prisma.state.upsert({
-            where: {
-              id: `${decodedEvent.channelId}.${decodedEvent.sequence}.RecvPacket`,
-            },
-            create: {
-              id: `${decodedEvent.channelId}.${decodedEvent.sequence}.RecvPacket`,
-              packetId: packet.id,
-              channelId: channel.id,
-              chainId: channel.chainId,
-              blockId: block.id,
-              type: "RecvPacket",
-              timestamp: transaction.timestamp,
-              latency: Number(
-                transaction.timestamp - sendPacketState.timestamp
-              ),
-              fromAddress: address.address,
-              portAddress: decodedEvent.portAddress,
-              data: transaction.data,
-              txHash: decodedEvent.tx,
-              nonce: transaction.nonce,
-              index: transaction.index,
-            },
-            update: {},
-          });
+            // create state
+            await prisma.state.upsert({
+              where: {
+                id: `${decodedEvent.channelId}.${decodedEvent.sequence}.RecvPacket`,
+              },
+              create: {
+                id: `${decodedEvent.channelId}.${decodedEvent.sequence}.RecvPacket`,
+                packetId: packet.id,
+                channelId: channel.id,
+                chainId: channel.chainId,
+                blockId: block.id,
+                type: "RecvPacket",
+                timestamp: transaction.timestamp,
+                latency: Number(
+                  transaction.timestamp - sendPacketState.timestamp
+                ),
+                fromAddress: address.address,
+                portAddress: decodedEvent.portAddress,
+                data: transaction.data,
+                txHash: decodedEvent.tx,
+                nonce: transaction.nonce,
+                index: transaction.index,
+              },
+              update: {},
+            });
 
-          console.log(
-            `RecvPacket ${channel.id} > ${channel.counterparty.id} #${decodedEvent.sequence}`
-          );
+            console.log(
+              `RecvPacket ${channel.id} > ${channel.counterparty.id} #${decodedEvent.sequence}`
+            );
+          } catch (e) {
+            console.error(e);
+          }
         } else if (decodedEvent.type === "WriteAckPacket") {
           // console.log("WriteAckPacket", decodedEvent);
 
-          const channel = await prisma.channel.findFirst({
-            where: {
-              id: decodedEvent.channelId,
-            },
-            include: {
-              counterparty: true,
-            },
-          });
+          try {
+            const channel = await prisma.channel.findFirst({
+              where: {
+                id: decodedEvent.channelId,
+              },
+              include: {
+                counterparty: true,
+              },
+            });
 
-          // this is the packet acknowledgement event
-          // update the packet record
+            // this is the packet acknowledgement event
+            // update the packet record
 
-          const packetId = `${channel.counterparty.id}.${decodedEvent.sequence}`;
+            const packetId = `${channel.counterparty.id}.${decodedEvent.sequence}`;
 
-          const packet = await prisma.packet.update({
-            where: { id: packetId },
-            data: {
-              currentState: "WriteAckPacket",
-            },
-          });
+            const packet = await prisma.packet.update({
+              where: { id: packetId },
+              data: {
+                currentState: "WriteAckPacket",
+              },
+            });
 
-          // create state
-          await prisma.state.upsert({
-            where: {
-              id: `${decodedEvent.channelId}.${decodedEvent.sequence}.WriteAckPacket`,
-            },
-            create: {
-              id: `${decodedEvent.channelId}.${decodedEvent.sequence}.WriteAckPacket`,
-              packetId: packet.id,
-              channelId: channel.id,
-              chainId: channel.chainId,
-              blockId: block.id,
-              type: "WriteAckPacket",
-              timestamp: transaction.timestamp,
-              latency: 0, // It happens together with the RecvPacket anyway
-              fromAddress: address.address,
-              portAddress: decodedEvent.portAddress,
-              data: transaction.data,
-              txHash: decodedEvent.tx,
-              nonce: transaction.nonce,
-              index: transaction.index,
-            },
-            update: {},
-          });
+            // create state
+            await prisma.state.upsert({
+              where: {
+                id: `${decodedEvent.channelId}.${decodedEvent.sequence}.WriteAckPacket`,
+              },
+              create: {
+                id: `${decodedEvent.channelId}.${decodedEvent.sequence}.WriteAckPacket`,
+                packetId: packet.id,
+                channelId: channel.id,
+                chainId: channel.chainId,
+                blockId: block.id,
+                type: "WriteAckPacket",
+                timestamp: transaction.timestamp,
+                latency: 0, // It happens together with the RecvPacket anyway
+                fromAddress: address.address,
+                portAddress: decodedEvent.portAddress,
+                data: transaction.data,
+                txHash: decodedEvent.tx,
+                nonce: transaction.nonce,
+                index: transaction.index,
+              },
+              update: {},
+            });
 
-          console.log(
-            `WriteAckPacket ${channel.id} > ${channel.counterparty.id} #${decodedEvent.sequence}`
-          );
+            console.log(
+              `WriteAckPacket ${channel.id} > ${channel.counterparty.id} #${decodedEvent.sequence}`
+            );
+          } catch (e) {
+            console.error(e);
+          }
         } else if (decodedEvent.type === "Acknowledgement") {
           // console.log("Acknowledgement", decodedEvent);
 
-          const channel = await prisma.channel.findFirst({
-            where: {
-              id: decodedEvent.channelId,
-            },
-            include: {
-              counterparty: true,
-            },
-          });
+          try {
+            const channel = await prisma.channel.findFirst({
+              where: {
+                id: decodedEvent.channelId,
+              },
+              include: {
+                counterparty: true,
+              },
+            });
 
-          // this is the packet acknowledgement event
-          // update the packet record
+            // this is the packet acknowledgement event
+            // update the packet record
 
-          const packetId = `${channel.id}.${decodedEvent.sequence}`;
+            const packetId = `${channel.id}.${decodedEvent.sequence}`;
 
-          const packet = await prisma.packet.update({
-            where: { id: packetId },
-            data: {
-              currentState: "Acknowledgement",
-            },
-          });
+            const packet = await prisma.packet.update({
+              where: { id: packetId },
+              data: {
+                currentState: "Acknowledgement",
+              },
+            });
 
-          const lastState = await prisma.state.findFirst({
-            where: {
-              packetId: packet.id,
-            },
-            orderBy: { timestamp: "desc" },
-          });
+            const lastState = await prisma.state.findFirst({
+              where: {
+                packetId: packet.id,
+              },
+              orderBy: { timestamp: "desc" },
+            });
 
-          // create state
-          await prisma.state.upsert({
-            where: {
-              id: `${decodedEvent.channelId}.${decodedEvent.sequence}.Acknowledgement`,
-            },
-            create: {
-              id: `${decodedEvent.channelId}.${decodedEvent.sequence}.Acknowledgement`,
-              packetId: packet.id,
-              channelId: channel.id,
-              chainId: channel.chainId,
-              blockId: block.id,
-              type: "Acknowledgement",
-              timestamp: transaction.timestamp,
-              latency:
-                Number(
-                  lastState && transaction.timestamp - lastState.timestamp
-                ) || 0,
-              fromAddress: address.address,
-              portAddress: decodedEvent.portAddress,
-              data: transaction.data,
-              txHash: decodedEvent.tx,
-              nonce: transaction.nonce,
-              index: transaction.index,
-            },
-            update: {},
-          });
+            // create state
+            await prisma.state.upsert({
+              where: {
+                id: `${decodedEvent.channelId}.${decodedEvent.sequence}.Acknowledgement`,
+              },
+              create: {
+                id: `${decodedEvent.channelId}.${decodedEvent.sequence}.Acknowledgement`,
+                packetId: packet.id,
+                channelId: channel.id,
+                chainId: channel.chainId,
+                blockId: block.id,
+                type: "Acknowledgement",
+                timestamp: transaction.timestamp,
+                latency:
+                  Number(
+                    lastState && transaction.timestamp - lastState.timestamp
+                  ) || 0,
+                fromAddress: address.address,
+                portAddress: decodedEvent.portAddress,
+                data: transaction.data,
+                txHash: decodedEvent.tx,
+                nonce: transaction.nonce,
+                index: transaction.index,
+              },
+              update: {},
+            });
 
-          console.log(
-            `Acknowledgement ${channel.id} > ${channel.counterparty.id} #${decodedEvent.sequence}`
-          );
+            console.log(
+              `Acknowledgement ${channel.id} > ${channel.counterparty.id} #${decodedEvent.sequence}`
+            );
+          } catch (e) {
+            console.error(e);
+          }
         }
       } // if
     } // for events
