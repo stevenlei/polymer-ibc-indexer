@@ -69,6 +69,10 @@ module.exports = /* GraphQL */ `
     id: String
     name: String
     type: String
+    availableClients: [String]
+    universalChannels: [Channel]
+    channelsCount: Int
+    packetsCount: Int
   }
 
   type Block {

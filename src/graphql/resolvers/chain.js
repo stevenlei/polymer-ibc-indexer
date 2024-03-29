@@ -8,9 +8,10 @@ type Chain {
   id: String
   name: String
   type: String
-  channels: ChannelConnection
-  blocks: BlockConnection
-  packets: PacketConnection
+  availableClients: [String]
+  universalChannels: [Channel]
+  channelsCount: Int
+  packetsCount: Int
 }
 
 type PacketConnection {
@@ -98,6 +99,49 @@ module.exports = {
       const results = await prisma.chain.findUnique({
         where: {
           id,
+        },
+      });
+
+      return results;
+    },
+  },
+  Chain: {
+    availableClients: async (parent, _args, { prisma }) => {
+      const results = await prisma.channel.findMany({
+        select: {
+          client: true,
+        },
+        where: {
+          chainId: parent.id,
+        },
+        distinct: ["client"],
+      });
+
+      return results.map((r) => r.client);
+    },
+    universalChannels: async (parent, _args, { prisma }) => {
+      const results = await prisma.channel.findMany({
+        where: {
+          chainId: parent.id,
+          type: "universal",
+        },
+      });
+
+      return results;
+    },
+    channelsCount: async (parent, _args, { prisma }) => {
+      const results = await prisma.channel.count({
+        where: {
+          chainId: parent.id,
+        },
+      });
+
+      return results;
+    },
+    packetsCount: async (parent, _args, { prisma }) => {
+      const results = await prisma.packet.count({
+        where: {
+          fromChainId: parent.id,
         },
       });
 
