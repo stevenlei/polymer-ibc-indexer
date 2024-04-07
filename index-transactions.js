@@ -10,6 +10,7 @@ const { ethers } = require("ethers");
 
 const providerOp = new ethers.JsonRpcProvider(process.env.OP_RPC_URL);
 const providerBase = new ethers.JsonRpcProvider(process.env.BASE_RPC_URL);
+const providerMolten = new ethers.JsonRpcProvider(process.env.MOLTEN_RPC_URL);
 
 const prisma = new PrismaClient();
 
@@ -38,6 +39,7 @@ async function indexTransactions() {
   return Promise.all([
     getBlocksAndTransactions("optimism-sepolia", providerOp),
     getBlocksAndTransactions("base-sepolia", providerBase),
+    getBlocksAndTransactions("molten-magma", providerMolten),
   ]);
 }
 

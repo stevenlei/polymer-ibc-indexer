@@ -31,7 +31,84 @@ if (watch) {
   console.log(`Running in watch mode`);
 }
 
+// correct mode: sometimes we want to re-process the data from a certain timestamp
+// for example, when there is a new chain added, we want to re-process the data
+const correct = process.argv.includes("--correct");
+let correctTimestamp = 0;
+
+if (correct) {
+  // get the value of the timestamp
+  correctTimestamp = process.argv[process.argv.indexOf("--correct") + 1];
+  console.log(`Correcting data from ${correctTimestamp}`);
+}
+
 async function main() {
+  // if correct mode, we need to re-process the data from a certain timestamp
+  if (correct) {
+    // so we need to delete all the data from that timestamp
+    // and re-process the data from that timestamp
+
+    // 1. get the correct `RawTransaction.id` - 1 from the timestamp
+    const correctTx = await prisma.rawTransaction.findFirst({
+      where: {
+        timestamp: {
+          lt: Number(correctTimestamp),
+        },
+      },
+      orderBy: [{ timestamp: "desc" }, { index: "desc" }],
+    });
+
+    if (!correctTx) {
+      console.log("No data to correct");
+      process.exit(0);
+    }
+
+    // 2. delete all the data from that timestamp, affected tables: Packet, State, Channel, Block
+    await prisma.state.deleteMany({
+      where: {
+        timestamp: {
+          gte: Number(correctTimestamp),
+        },
+      },
+    });
+
+    await prisma.packet.deleteMany({
+      where: {
+        timestamp: {
+          gte: Number(correctTimestamp),
+        },
+      },
+    });
+
+    await prisma.channel.deleteMany({
+      where: {
+        timestamp: {
+          gte: Number(correctTimestamp),
+        },
+      },
+    });
+
+    await prisma.block.deleteMany({
+      where: {
+        timestamp: {
+          gte: Number(correctTimestamp),
+        },
+      },
+    });
+
+    // 3. update the last processed index status
+    await prisma.indexerStatus.upsert({
+      where: { id: "last-processed-txid" },
+      create: {
+        id: "last-processed-txid",
+        value: `${correctTx.id}`,
+      },
+      update: {
+        value: `${correctTx.id}`,
+      },
+    });
+  }
+
   //
   while (true) {
     await processData();
@@ -169,7 +246,7 @@ async function processData() {
               where: { id: origin.channelId },
               create: {
                 id: origin.channelId,
-                chainId: counterpartyChainId(event.chain),
+                chainId: chainIdFromClient(origin.port.client),
                 // blockId: block.id,
                 type: channelType(origin.channelId),
                 client: origin.port.client,
@@ -183,7 +260,7 @@ async function processData() {
                 timestamp: transaction.timestamp,
               },
               update: {
-                chainId: counterpartyChainId(event.chain),
+                chainId: chainIdFromClient(origin.port.client),
                 type: channelType(origin.channelId),
                 client: origin.port.client,
                 portAddress: origin.port.portAddress,
@@ -570,11 +647,15 @@ function channelType(channelId) {
   }
 }
 
-function counterpartyChainId(client) {
-  if (client.includes("optimism")) {
+function chainIdFromClient(client) {
+  if (client.includes("base")) {
     return "base-sepolia";
-  } else {
+  } else if (client.includes("optimism")) {
     return "optimism-sepolia";
+  } else if (client.includes("molten")) {
+    return "molten-magma";
+  } else {
+    throw new Error("Unknown chain id from client");
   }
 }
 

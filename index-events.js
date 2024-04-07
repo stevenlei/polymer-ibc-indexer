@@ -4,9 +4,11 @@ const { ethers } = require("ethers");
 
 const OP_GENESIS_BLOCK = 8752864;
 const BASE_GENESIS_BLOCK = 6768208;
+const MOLTEN_GENESIS_BLOCK = 3587398;
 
 const providerOp = new ethers.JsonRpcProvider(process.env.OP_RPC_URL);
 const providerBase = new ethers.JsonRpcProvider(process.env.BASE_RPC_URL);
+const providerMolten = new ethers.JsonRpcProvider(process.env.MOLTEN_RPC_URL);
 
 const opContractAddresses = [
   process.env.OP_DISPATCHER,
@@ -17,6 +19,8 @@ const baseContractAddresses = [
   process.env.BASE_DISPATCHER,
   process.env.BASE_DISPATCHER_SIM,
 ];
+
+const moltenContractAddresses = [process.env.MOLTEN_DISPATCHER_SIM];
 
 const prisma = new PrismaClient();
 
@@ -43,11 +47,15 @@ async function main() {
 async function indexEvents() {
   const lastBlockOp = await getLastIndexedBlockNumber("optimism-sepolia");
   const lastBlockBase = await getLastIndexedBlockNumber("base-sepolia");
+  const lastBlockMolten = await getLastIndexedBlockNumber("molten-magma");
 
   const START_BLOCK_OP = lastBlockOp ? lastBlockOp + 1 : OP_GENESIS_BLOCK;
   const START_BLOCK_BASE = lastBlockBase
     ? lastBlockBase + 1
     : BASE_GENESIS_BLOCK;
+  const START_BLOCK_MOLTEN = lastBlockMolten
+    ? lastBlockMolten + 1
+    : MOLTEN_GENESIS_BLOCK;
 
   const all = await Promise.all([
     getNewEvents(
@@ -62,6 +70,13 @@ async function indexEvents() {
       providerBase,
       baseContractAddresses,
       START_BLOCK_BASE,
+      5000
+    ),
+    getNewEvents(
+      "molten-magma",
+      providerMolten,
+      moltenContractAddresses,
+      START_BLOCK_MOLTEN,
       5000
     ),
   ]);
@@ -89,12 +104,25 @@ async function indexEvents() {
 }
 
 async function getLastIndexedBlockNumber(chain) {
-  const lastRecord = await prisma.rawEvent.findFirst({
-    where: { chain },
-    orderBy: { blockNumber: "desc" },
+  const lastEventBlockNumberQuery = await prisma.indexerStatus.findUnique({
+    where: { id: `last-event-blocknumber-${chain}` },
   });
 
-  return lastRecord ? lastRecord.blockNumber : null;
+  let lastEventBlockNumber = lastEventBlockNumberQuery
+    ? Number(lastEventBlockNumberQuery.value)
+    : 0;
+
+  // fallback: if the last event block number is 0, find the last indexed event from the db
+  if (lastEventBlockNumber === 0) {
+    const lastRecord = await prisma.rawEvent.findFirst({
+      where: { chain },
+      orderBy: { blockNumber: "desc" },
+    });
+
+    lastEventBlockNumber = lastRecord ? lastRecord.blockNumber : 0;
+  }
+
+  return lastEventBlockNumber || null;
 }
 
 async function getNewEvents(
@@ -139,6 +167,18 @@ async function getNewEvents(
         (latestBlock - startBlock) / perBatch
       )}`
     );
+
+    // update the last processed index status
+    await prisma.indexerStatus.upsert({
+      where: { id: `last-event-blocknumber-${chain}` },
+      create: {
+        id: `last-event-blocknumber-${chain}`,
+        value: `${toBlock}`,
+      },
+      update: {
+        value: `${toBlock}`,
+      },
+    });
   }
 
   return results;
