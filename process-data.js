@@ -2,6 +2,7 @@ require("dotenv").config();
 const { PrismaClient } = require("@prisma/client");
 const { ethers } = require("ethers");
 const dispatcherAbi = require("./abi/Dispatcher.json");
+const dispatcherAbiV2 = require("./abi/DispatcherV2.json");
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
 // encode event signature to match
@@ -20,6 +21,81 @@ const signatureWriteAckPacket = ethers.id(
 );
 const signatureAcknowledgement = ethers.id(
   "Acknowledgement(address,bytes32,uint64)"
+);
+
+/*
+
+Polymer Dispatcher V2 events
+ 
+event ChannelOpenInit(
+    address indexed recevier,
+    string version,
+    ChannelOrder ordering,
+    bool feeEnabled,
+    string[] connectionHops,
+    string counterpartyPortId
+);
+event ChannelOpenInitError(address indexed receiver, bytes error);
+
+event ChannelOpenTry(
+    address indexed receiver,
+    string version,
+    ChannelOrder ordering,
+    bool feeEnabled,
+    string[] connectionHops,
+    string counterpartyPortId,
+    bytes32 counterpartyChannelId
+);
+event ChannelOpenTryError(address indexed receiver, bytes error);
+
+event ChannelOpenAck(address indexed receiver, bytes32 channelId);
+event ChannelOpenAckError(address indexed receiver, bytes error);
+
+event ChannelOpenConfirm(address indexed receiver, bytes32 channelId);
+event ChannelOpenConfirmError(address indexed receiver, bytes error);
+
+event CloseIbcChannel(address indexed portAddress, bytes32 indexed channelId);
+
+event CloseIbcChannelError(address indexed receiver, bytes error);
+event AcknowledgementError(address indexed receiver, bytes error);
+event TimeoutError(address indexed receiver, bytes error);
+
+event SendPacket(
+    address indexed sourcePortAddress,
+    bytes32 indexed sourceChannelId,
+    bytes packet,
+    uint64 sequence,
+    // timeoutTimestamp is in UNIX nano seconds; packet will be rejected if
+    // delivered after this timestamp on the receiving chain.
+    // Timeout semantics is compliant to IBC spec and ibc-go implementation
+    uint64 timeoutTimestamp
+);
+
+event Acknowledgement(address indexed sourcePortAddress, bytes32 indexed sourceChannelId, uint64 sequence);
+
+event Timeout(address indexed sourcePortAddress, bytes32 indexed sourceChannelId, uint64 indexed sequence);
+
+event RecvPacket(address indexed destPortAddress, bytes32 indexed destChannelId, uint64 sequence);
+
+event WriteAckPacket(
+    address indexed writerPortAddress, bytes32 indexed writerChannelId, uint64 sequence, AckPacket ackPacket
+);
+
+event WriteTimeoutPacket(
+    address indexed writerPortAddress,
+    bytes32 indexed writerChannelId,
+    uint64 sequence,
+    Height timeoutHeight,
+    uint64 timeoutTimestamp
+);
+*/
+
+const signatureChannelOpenTry = ethers.id(
+  "ChannelOpenTry(address,string,uint8,bool,string[],string,bytes32)"
+);
+const signatureChannelOpenAck = ethers.id("ChannelOpenAck(address,bytes32)");
+const signatureChannelOpenConfirm = ethers.id(
+  "ChannelOpenConfirm(address,bytes32)"
 );
 
 const prisma = new PrismaClient();
@@ -205,41 +281,82 @@ async function processData() {
       if (decodedEvent) {
         // console.log(event.chain, decodedEvent);
 
-        if (decodedEvent.type === "OpenIbcChannel") {
+        if (
+          decodedEvent.type === "OpenIbcChannel" ||
+          decodedEvent.type === "ChannelOpenTry"
+        ) {
           // if counterpartyChannelId === '', this is the first step of initiating a channel
           if (decodedEvent.counterpartyChannelId === "") {
             //
           } else if (decodedEvent.counterpartyChannelId !== "") {
             // this is the handshake event (2nd step)
 
-            const iface = new ethers.Interface(dispatcherAbi);
-            const functionDataDecoded = iface.decodeFunctionData(
-              "openIbcChannel",
-              transaction.data
-            );
+            let iface;
+            let functionDataDecoded;
+
+            if (decodedEvent.type === "OpenIbcChannel") {
+              iface = new ethers.Interface(dispatcherAbi);
+              functionDataDecoded = iface.decodeFunctionData(
+                "openIbcChannel",
+                transaction.data
+              );
+            } else if (decodedEvent.type === "ChannelOpenTry") {
+              iface = new ethers.Interface(dispatcherAbiV2);
+              functionDataDecoded = iface.decodeFunctionData(
+                "channelOpenTry",
+                transaction.data
+              );
+            }
+
+            if (!iface || !functionDataDecoded) {
+              throw new Error("Invalid function data");
+            }
+
+            // console.log(functionDataDecoded);
 
             // so we have both the counterparty (originating) and local (destination) channel ids here
             // counterparty channel id is from the event
             // local channel id is from the function data
             const destination = {};
-            destination.portId = functionDataDecoded[1][0];
-            destination.port = extractPortId(destination.portId);
-            destination.channelId = ethers.decodeBytes32String(
-              functionDataDecoded[1][1]
-            );
-            destination.version = functionDataDecoded[1][2];
-
-            // console.log("destination", destination);
-
             const origin = {};
-            origin.portId = functionDataDecoded[5][0];
-            origin.port = extractPortId(origin.portId);
-            origin.channelId = ethers.decodeBytes32String(
-              functionDataDecoded[5][1]
-            );
-            origin.version = functionDataDecoded[5][2];
 
-            // console.log("origin", origin);
+            if (decodedEvent.type === "OpenIbcChannel") {
+              destination.portId = functionDataDecoded[1][0];
+              destination.port = extractPortId(destination.portId);
+              destination.channelId = ethers.decodeBytes32String(
+                functionDataDecoded[1][1]
+              );
+              destination.version = functionDataDecoded[1][2];
+
+              // console.log("destination", destination);
+
+              origin.portId = functionDataDecoded[5][0];
+              origin.port = extractPortId(origin.portId);
+              origin.channelId = ethers.decodeBytes32String(
+                functionDataDecoded[5][1]
+              );
+              origin.version = functionDataDecoded[5][2];
+
+              // console.log("origin", origin);
+            } else if (decodedEvent.type === "ChannelOpenTry") {
+              destination.portId = functionDataDecoded[0][0];
+              destination.port = extractPortId(destination.portId);
+              destination.channelId = ethers.decodeBytes32String(
+                functionDataDecoded[0][1]
+              );
+              destination.version = functionDataDecoded[0][2];
+
+              // console.log("destination", destination);
+
+              origin.portId = functionDataDecoded[4][0];
+              origin.port = extractPortId(origin.portId);
+              origin.channelId = ethers.decodeBytes32String(
+                functionDataDecoded[4][1]
+              );
+              origin.version = functionDataDecoded[4][2];
+
+              // console.log("origin", origin);
+            }
 
             // origin
             await prisma.channel.upsert({
@@ -320,17 +437,49 @@ async function processData() {
               `Channel ${origin.channelId} <> ${destination.channelId} created`
             );
           }
-        } else if (decodedEvent.type === "ConnectIbcChannel") {
+        } else if (
+          decodedEvent.type === "ConnectIbcChannel" ||
+          decodedEvent.type === "ChannelOpenAck" ||
+          decodedEvent.type === "ChannelOpenConfirm"
+        ) {
           // this is the final step of the handshake
           // we just need to update the state to 3 indicating the channel is open
 
-          const iface = new ethers.Interface(dispatcherAbi);
-          const functionDataDecoded = iface.decodeFunctionData(
-            "connectIbcChannel",
-            transaction.data
-          );
+          let iface;
+          let functionDataDecoded;
+          let connectionHops;
 
-          const connectionHops = JSON.stringify(functionDataDecoded[2]);
+          if (decodedEvent.type === "ConnectIbcChannel") {
+            iface = new ethers.Interface(dispatcherAbi);
+            functionDataDecoded = iface.decodeFunctionData(
+              "connectIbcChannel",
+              transaction.data
+            );
+
+            connectionHops = JSON.stringify(functionDataDecoded[2]);
+          } else if (decodedEvent.type === "ChannelOpenAck") {
+            iface = new ethers.Interface(dispatcherAbiV2);
+            functionDataDecoded = iface.decodeFunctionData(
+              "channelOpenAck",
+              transaction.data
+            );
+
+            connectionHops = JSON.stringify(functionDataDecoded[1]);
+          } else if (decodedEvent.type === "ChannelOpenConfirm") {
+            iface = new ethers.Interface(dispatcherAbiV2);
+            functionDataDecoded = iface.decodeFunctionData(
+              "channelOpenConfirm",
+              transaction.data
+            );
+
+            connectionHops = JSON.stringify(functionDataDecoded[1]);
+          }
+
+          if (!iface || !functionDataDecoded || !connectionHops) {
+            throw new Error("Invalid function data");
+          }
+
+          // console.log(decodedEvent);
 
           await prisma.channel.update({
             where: { id: decodedEvent.channelId },
@@ -664,8 +813,23 @@ async function decodeEvent(event) {
   const topic = topics[0];
 
   try {
-    if (topic === signatureOpenIbcChannel) {
+    if (
+      topic === signatureOpenIbcChannel ||
+      topic === signatureChannelOpenTry
+    ) {
       // console.log("OpenIbcChannel", event);
+
+      let type;
+
+      if (topic === signatureOpenIbcChannel) {
+        type = "OpenIbcChannel";
+      } else if (topic === signatureChannelOpenTry) {
+        type = "ChannelOpenTry";
+      }
+
+      if (!type) {
+        throw new Error("Invalid type");
+      }
 
       const [portAddress] = abiCoder.decode(["address"], topics[1]);
 
@@ -682,7 +846,7 @@ async function decodeEvent(event) {
       );
 
       const result = {
-        type: "OpenIbcChannel",
+        type,
         version: version,
         ordering: Number(ordering),
         feeEnabled: feeEnabled,
@@ -697,14 +861,26 @@ async function decodeEvent(event) {
       };
 
       return result;
-    } else if (topic === signatureConnectIbcChannel) {
+    } else if (
+      topic === signatureConnectIbcChannel ||
+      topic === signatureChannelOpenAck ||
+      topic === signatureChannelOpenConfirm
+    ) {
       // console.log("ConnectIbcChannel", event);
 
       const [portAddress] = abiCoder.decode(["address"], topics[1]);
       const [channelId] = abiCoder.decode(["bytes32"], event.data);
 
+      let type = "ConnectIbcChannel";
+
+      if (topic === signatureChannelOpenAck) {
+        type = "ChannelOpenAck";
+      } else if (topic === signatureChannelOpenConfirm) {
+        type = "ChannelOpenConfirm";
+      }
+
       const result = {
-        type: "ConnectIbcChannel",
+        type,
         channelId: ethers.decodeBytes32String(channelId),
         portAddress: portAddress,
         block: event.blockNumber,

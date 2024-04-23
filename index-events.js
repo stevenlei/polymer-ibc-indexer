@@ -11,16 +11,18 @@ const providerBase = new ethers.JsonRpcProvider(process.env.BASE_RPC_URL);
 const providerMolten = new ethers.JsonRpcProvider(process.env.MOLTEN_RPC_URL);
 
 const opContractAddresses = [
-  process.env.OP_DISPATCHER,
-  process.env.OP_DISPATCHER_SIM,
-];
+  process.env.OP_DISPATCHER.split(","),
+  process.env.OP_DISPATCHER_SIM.split(","),
+].flat();
 
 const baseContractAddresses = [
-  process.env.BASE_DISPATCHER,
-  process.env.BASE_DISPATCHER_SIM,
-];
+  process.env.BASE_DISPATCHER.split(","),
+  process.env.BASE_DISPATCHER_SIM.split(","),
+].flat();
 
-const moltenContractAddresses = [process.env.MOLTEN_DISPATCHER_SIM];
+const moltenContractAddresses = [
+  process.env.MOLTEN_DISPATCHER_SIM.split(","),
+].flat();
 
 const prisma = new PrismaClient();
 
@@ -31,8 +33,58 @@ if (watch) {
   console.log(`Running in watch mode`);
 }
 
+// correct mode: sometimes we want to re-process the data from a certain timestamp
+// for example, when there is a new chain added, we want to re-process the data
+const correct = process.argv.includes("--correct");
+let correctTimestamp = 0;
+
+if (correct) {
+  // get the value of the timestamp
+  correctTimestamp = process.argv[process.argv.indexOf("--correct") + 1];
+  console.log(`Correcting data from ${correctTimestamp}`);
+}
+
 async function main() {
-  //
+  // If correct mode is enabled, delete all the events and transactions from that timestamp onwards
+  if (correct) {
+    // we need to know the first block number from that timestamp of each chain
+    // as timestamp is only available in transactions, not in events
+
+    const chains = await prisma.chain.findMany();
+
+    for (const chain of chains) {
+      // get the first block number from that timestamp
+      const firstBlock = await prisma.rawTransaction.findFirst({
+        where: {
+          chain: chain.id,
+          timestamp: { gte: correctTimestamp },
+        },
+        orderBy: { blockNumber: "asc" },
+      });
+
+      if (firstBlock) {
+        console.log(
+          `Deleting data from ${firstBlock.blockNumber} onwards for ${chain.id}`
+        );
+
+        // delete all the events and transactions from that block number onwards
+        await prisma.rawEvent.deleteMany({
+          where: {
+            chain: chain.id,
+            blockNumber: { gte: firstBlock.blockNumber },
+          },
+        });
+
+        await prisma.rawTransaction.deleteMany({
+          where: {
+            chain: chain.id,
+            blockNumber: { gte: firstBlock.blockNumber },
+          },
+        });
+      }
+    }
+  }
+
   while (true) {
     await indexEvents();
     if (!watch) {
@@ -45,9 +97,18 @@ async function main() {
 }
 
 async function indexEvents() {
-  const lastBlockOp = await getLastIndexedBlockNumber("optimism-sepolia");
-  const lastBlockBase = await getLastIndexedBlockNumber("base-sepolia");
-  const lastBlockMolten = await getLastIndexedBlockNumber("molten-magma");
+  const lastBlockOp = await getLastIndexedBlockNumber(
+    "optimism-sepolia",
+    correct
+  );
+  const lastBlockBase = await getLastIndexedBlockNumber(
+    "base-sepolia",
+    correct
+  );
+  const lastBlockMolten = await getLastIndexedBlockNumber(
+    "molten-magma",
+    correct
+  );
 
   const START_BLOCK_OP = lastBlockOp ? lastBlockOp + 1 : OP_GENESIS_BLOCK;
   const START_BLOCK_BASE = lastBlockBase
@@ -103,7 +164,7 @@ async function indexEvents() {
   });
 }
 
-async function getLastIndexedBlockNumber(chain) {
+async function getLastIndexedBlockNumber(chain, correctMode = false) {
   const lastEventBlockNumberQuery = await prisma.indexerStatus.findUnique({
     where: { id: `last-event-blocknumber-${chain}` },
   });
@@ -113,7 +174,7 @@ async function getLastIndexedBlockNumber(chain) {
     : 0;
 
   // fallback: if the last event block number is 0, find the last indexed event from the db
-  if (lastEventBlockNumber === 0) {
+  if (lastEventBlockNumber === 0 || correctMode) {
     const lastRecord = await prisma.rawEvent.findFirst({
       where: { chain },
       orderBy: { blockNumber: "desc" },

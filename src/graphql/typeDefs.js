@@ -130,7 +130,7 @@ module.exports = /* GraphQL */ `
     sequence: Int
     from: Address
     currentState: PacketType
-    timeout: Int
+    timeout: Float
     timestamp: Int
     states: [PacketState]
   }
